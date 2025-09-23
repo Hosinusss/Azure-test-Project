@@ -1,0 +1,39 @@
+name: Build and Push to ACR (personal creds)
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Azure login (username/password) 
+        # azure/login supports username/password (note: can fail with MFA)
+        uses: azure/login@v1
+        with:
+          username: ${{ secrets.AZURE_USERNAME }}
+          password: ${{ secrets.AZURE_PASSWORD }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure az CLI can see subscription
+        run: az account show --query "{id:id, tenantId:tenantId}" -o table
+
+      - name: Login to ACR using az (generates docker credentials)
+        run: az acr login --name myacrhosni
+
+      - name: Build Docker image
+        run: docker build -t myacrhosni.azurecr.io/myapp_backend:latest .
+
+      - name: Tag & Push to ACR
+        run: |
+          docker push myacrhosni.azurecr.io/myapp_backend:latest
